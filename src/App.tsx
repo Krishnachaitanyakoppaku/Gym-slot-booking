@@ -7,7 +7,7 @@ import Booking from './components/Booking';
 import ExerciseGuidance from './components/ExerciseGuidance';
 import Contact from './components/Contact';
 import MyBookedSlots from './components/MyBookedSlots';
-import AdminDashboard from './components/AdminDashboard';
+import AdminDashboard from './components/SimpleAdminDashboard';
 
 const App: React.FC = () => {
   return (

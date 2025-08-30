@@ -328,7 +328,7 @@ const SimpleAdminDashboard: React.FC = () => {
                 }}>
                   {formatDate(slot.date)} - {slot.time_slot}
                 </div>
-                <div style
+                <div>
                   <button
                     onClick={() => toggleSlot(slot.id, slot.is_blocked)}
                     disabled={loading}
@@ -345,10 +345,10 @@ const SimpleAdminDashboard: React.FC = () => {
                     {slot.is_blocked ? 'UNBLOCK' : 'BLOCK'}
                   </button>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {slots.length === 0 && !loading && (
