@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const Home: React.FC = () => {
+const Home: React.FC = React.memo(() => {
   const [showProfile, setShowProfile] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
   const navigate = useNavigate();
 
+  // Initialize user data only once
   useEffect(() => {
     const storedUserName = localStorage.getItem('userName') || 'CS23B1027';
     const storedUserEmail = localStorage.getItem('userEmail') || 'cs23b1027@iiitdm.ac.in';
@@ -14,19 +15,25 @@ const Home: React.FC = () => {
     setUserEmail(storedUserEmail);
   }, []);
 
-  const toggleProfile = () => {
-    setShowProfile(!showProfile);
-  };
+  const toggleProfile = useCallback(() => {
+    setShowProfile(prev => !prev);
+  }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem('userName');
     localStorage.removeItem('userEmail');
     navigate('/');
-  };
+  }, [navigate]);
 
   const navigateToPage = useCallback((path: string) => {
     navigate(path);
   }, [navigate]);
+
+  // Memoize user info to prevent unnecessary re-renders
+  const userInfo = useMemo(() => ({
+    userName,
+    userEmail
+  }), [userName, userEmail]);
 
   return (
     <div className="home-background">
@@ -40,8 +47,8 @@ const Home: React.FC = () => {
         {showProfile && (
           <div className="profile-dropdown show">
             <div className="user-info">
-              <div className="user-name">{userName}</div>
-              <div className="user-email">{userEmail}</div>
+              <div className="user-name">{userInfo.userName}</div>
+              <div className="user-email">{userInfo.userEmail}</div>
             </div>
             <button className="dropdown-item" onClick={handleLogout}>
               <i className="fas fa-sign-out-alt"></i>
@@ -84,6 +91,8 @@ const Home: React.FC = () => {
       </div>
     </div>
   );
-};
+});
+
+Home.displayName = 'Home';
 
 export default Home;
