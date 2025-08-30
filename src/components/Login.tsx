@@ -67,13 +67,13 @@ const Login: React.FC = () => {
 
   return (
     <div className="login-background">
-      <a href="/home">
-        <img 
-          src="https://imgs.search.brave.com/ZsY8in-PibjX4NPQmLpQK2yJI9HSJWoT7I3vZOWioiY/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly91cGxv/YWQud2lraW1lZGlh/Lm9yZy93aWtpcGVk/aWEvZW4vdGh1bWIv/NC80YS9JbmRpYW5f/SW5zdGl0dXRlX29m/X0luZm9ybWF0aW9u/X1RlY2hub2xvZ3kl/MkNfRGVzaWduX2Fu/ZF9NYW51ZmFjdHVy/aW5nJTJDX0thbmNo/ZWVwdXJhbV9sb2dv/LnBuZy81MTJweC1J/bmRpYW5fSW5zdGl0/dXRlX29mX0luZm9y/bWF0aW9uX1RlY2hu/b2xvZ3klMkNfRGVz/aWduX2FuZF9NYW51/ZmFjdHVyaW5nJTJD/X0thbmNoZWVwdXJh/bV9sb2dvLnBuZw" 
-          alt="IIITDM Gym Logo" 
-          className="logo" 
-        />
-      </a>
+      <img 
+        src="https://imgs.search.brave.com/ZsY8in-PibjX4NPQmLpQK2yJI9HSJWoT7I3vZOWioiY/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly91cGxv/YWQud2lraW1lZGlh/Lm9yZy93aWtpcGVk/aWEvZW4vdGh1bWIv/NC80YS9JbmRpYW5f/SW5zdGl0dXRlX29m/X0luZm9ybWF0aW9u/X1RlY2hub2xvZ3kl/MkNfRGVzaWduX2Fu/ZF9NYW51ZmFjdHVy/aW5nJTJDX0thbmNo/ZWVwdXJhbV9sb2dv/LnBuZy81MTJweC1J/bmRpYW5fSW5zdGl0/dXRlX29mX0luZm9y/bWF0aW9uX1RlY2hu/b2xvZ3klMkNfRGVz/aWduX2FuZF9NYW51/ZmFjdHVyaW5nJTJD/X0thbmNoZWVwdXJh/bV9sb2dvLnBuZw" 
+        alt="IIITDM Gym Logo" 
+        className="logo" 
+        onClick={() => navigate('/home')}
+        style={{ cursor: 'pointer' }}
+      />
       <div className="login-container">
         <div className="login-header">
           <h1>{isLogin ? 'Welcome Back' : 'Create Account'}</h1>

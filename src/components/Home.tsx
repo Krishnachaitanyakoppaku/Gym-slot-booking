@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const Home: React.FC = () => {
@@ -24,9 +24,9 @@ const Home: React.FC = () => {
     navigate('/');
   };
 
-  const navigateToPage = (path: string) => {
+  const navigateToPage = useCallback((path: string) => {
     navigate(path);
-  };
+  }, [navigate]);
 
   return (
     <div className="home-background">

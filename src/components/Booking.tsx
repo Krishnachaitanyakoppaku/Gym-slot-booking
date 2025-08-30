@@ -219,8 +219,8 @@ const Booking: React.FC = () => {
       <div className="booking-background">
         <div className="container">
           <div className="page-header">
-            <button className="back-button" onClick={() => navigate('/')}>
-              ← Back to Login
+            <button className="back-button" onClick={() => navigate('/home')}>
+              ← Back to Home
             </button>
             <h1>Please Login</h1>
             <p>You need to be logged in to book gym slots.</p>
