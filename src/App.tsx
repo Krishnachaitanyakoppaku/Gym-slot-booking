@@ -7,7 +7,9 @@ import Booking from './components/Booking';
 import ExerciseGuidance from './components/ExerciseGuidance';
 import Contact from './components/Contact';
 import MyBookedSlots from './components/MyBookedSlots';
-import AdminDashboard from './components/SimpleAdminDashboard';
+import AdminDashboard from './components/AdminDashboard';
+import AdminTest from './components/AdminTest';
+import BookedStudentsList from './components/BookedStudentsList';
 
 const App: React.FC = () => {
   return (
@@ -22,6 +24,8 @@ const App: React.FC = () => {
             <Route path="/contact" element={<Contact />} />
             <Route path="/my-bookings" element={<MyBookedSlots />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin-test" element={<AdminTest />} />
+            <Route path="/admin/booked-students" element={<BookedStudentsList />} />
           </Routes>
         </div>
       </Router>

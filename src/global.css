@@ -700,6 +700,16 @@ code {
   cursor: not-allowed;
 }
 
+.booking-slot.open {
+  background: rgba(76, 175, 80, 0.9); /* Green */
+  color: white;
+}
+
+.booking-slot.blocked {
+  background: rgba(255, 0, 0, 0.9); /* Red */
+  color: white;
+}
+
 .booking-slot.past {
   background: rgba(220, 220, 220, 0.9) !important;
   color: #333 !important;

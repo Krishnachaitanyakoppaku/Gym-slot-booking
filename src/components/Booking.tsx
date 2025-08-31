@@ -1,9 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { slotService } from '../services/slotService';
 import { bookingService } from '../services/bookingService';
 import { supabase, Slot, Booking as BookingType } from '../lib/supabase';
+
+// Helper functions for date management - moved to top
+const getStartOfDay = (date: Date) => {
+  const newDate = new Date(date);
+  newDate.setHours(0, 0, 0, 0);
+  return newDate;
+};
+
+const getStartOfCurrentWeek = (currentDate: Date) => {
+  const today = getStartOfDay(currentDate);
+  const dayOfWeek = today.getDay();
+  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Make Monday = 0
+  const startOfCurrentWeek = new Date(today);
+  startOfCurrentWeek.setDate(today.getDate() - daysToSubtract);
+  return startOfCurrentWeek;
+};
 
 interface SelectedSlot {
   time: string;
@@ -15,7 +31,7 @@ interface SlotWithBookings extends Slot {
   bookingCount: number;
 }
 
-type SlotStatus = 'available' | 'filling-fast' | 'full' | 'blocked';
+type SlotStatus = 'available' | 'filling-fast' | 'full' | 'blocked' | 'past';
 
 const Booking: React.FC = () => {
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -24,7 +40,8 @@ const Booking: React.FC = () => {
   const [bookings, setBookings] = useState<{ [key: string]: number }>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
-  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(new Date());
+  // Initialize currentWeekStart using the helper function
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getStartOfCurrentWeek(new Date()));
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -39,8 +56,8 @@ const Booking: React.FC = () => {
 
   const days: string[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-  // Helper functions for date management
-  const getWeekDates = (startDate: Date): Date[] => {
+  // Helper functions for date management - now defined after state for useCallback usage
+  const getWeekDates = useCallback((startDate: Date): Date[] => {
     const week: Date[] = [];
     const start = new Date(startDate);
     
@@ -56,7 +73,7 @@ const Booking: React.FC = () => {
     }
     
     return week;
-  };
+  }, []);
 
   const formatDate = (date: Date): string => {
     return date.toISOString().split('T')[0];
@@ -72,53 +89,51 @@ const Booking: React.FC = () => {
     return new Date().toLocaleDateString('en-US', options);
   };
 
+  const isPast = (date: Date): boolean => {
+    return getStartOfDay(date) < getStartOfDay(new Date());
+  };
+
   // Load slots and bookings data
   useEffect(() => {
     loadSlotsData();
   }, [currentWeekStart]);
 
-  const loadSlotsData = async () => {
+  const loadSlotsData = useCallback(async () => {
     try {
       setLoading(true);
       setError(''); // Clear any previous errors
       
       const weekDates = getWeekDates(currentWeekStart);
-      const dateStrings = weekDates.map(formatDate);
+      // Calculate next week's dates
+      const nextWeekStart = new Date(currentWeekStart);
+      nextWeekStart.setDate(currentWeekStart.getDate() + 7);
+      const nextWeekDates = getWeekDates(nextWeekStart);
+
+      const allDates = [...weekDates, ...nextWeekDates]; // Combine current and next week dates
+      const dateStrings = allDates.map(formatDate);
       
-      // Note: Don't initialize slots for regular users - only admins should create slots
-      // Slots should be pre-created by admin through the admin dashboard
-      
-      // Get ALL slots (including blocked ones) so users can see the full schedule
       const slotsData = await slotService.getAllSlotsForWeekSafe(dateStrings);
       
-      // Get booking counts for all slots in one query (much faster!)
       const slotIds = slotsData.map(slot => slot.id);
       const bookingCountsBySlotIdActual = slotIds.length > 0 
         ? await bookingService.getBookingCountsForSlots(slotIds)
         : {};
       
-      // Create booking counts lookup by date-time for UI compatibility
       const bookingCounts: { [key: string]: number } = {};
-      
-      // Create slots with booking counts
-      const slotsWithBookings: SlotWithBookings[] = slotsData.map(slot => {
+      slotsData.forEach(slot => {
         const bookingCount = bookingCountsBySlotIdActual[slot.id] || 0;
         const key = `${slot.date}-${slot.time_slot}`;
         bookingCounts[key] = bookingCount;
-        
-        return {
-          ...slot,
-          bookingCount
-        };
       });
       
-      setSlots(slotsWithBookings);
+      // Transform slotsData into SlotWithBookings[]
+      const slotsWithBookingCounts: SlotWithBookings[] = slotsData.map(slot => ({
+        ...slot,
+        bookingCount: bookingCountsBySlotIdActual[slot.id] || 0
+      }));
+
+      setSlots(slotsWithBookingCounts);
       setBookings(bookingCounts);
-      
-      // Log performance info in development
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Loaded ${slotsWithBookings.length} slots with booking counts`);
-      }
       
     } catch (err: any) {
       console.error('Error loading slots:', err);
@@ -126,7 +141,7 @@ const Booking: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentWeekStart, getWeekDates]);
 
   const getSlotForDate = (date: Date, timeSlot: string): SlotWithBookings | null => {
     const dateStr = formatDate(date);
@@ -134,10 +149,11 @@ const Booking: React.FC = () => {
   };
 
   const getSlotStatus = (date: Date, timeSlot: string): SlotStatus => {
+    if (isPast(date)) return 'past'; // Check for past dates first
+
     const slot = getSlotForDate(date, timeSlot);
-    if (!slot) return 'available'; // No slot data means it's available for booking
+    if (!slot) return 'available'; 
     
-    // Check if slot is blocked first
     if (slot.is_blocked) return 'blocked';
     
     const count = slot.bookingCount;
@@ -162,6 +178,11 @@ const Booking: React.FC = () => {
       return;
     }
 
+    if (isPast(date)) {
+      alert('You cannot book slots for past dates.');
+      return;
+    }
+
     const status = getSlotStatus(date, timeSlot);
     if (status === 'full' || status === 'blocked') return;
 
@@ -181,29 +202,25 @@ const Booking: React.FC = () => {
       setLoading(true);
       setError('');
       
-      // Ensure user is authenticated with Supabase
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Please login again to book slots');
       }
       
-      console.log('Creating booking for user:', session.user.id);
-      console.log('Slot:', selectedSlot.date, selectedSlot.time);
-      
       await bookingService.createBooking(session.user.id, selectedSlot.date, selectedSlot.time);
       
-      // Refresh slots data
       await loadSlotsData();
       
       setShowModal(false);
       setSelectedSlot(null);
-      setError('');
-      
-      // Show success message
       alert('Booking confirmed successfully!');
     } catch (err: any) {
-      console.error('Booking error:', err);
-      setError(err.message || 'Failed to create booking');
+      if (err.message.includes('one slot per day')) {
+        alert(err.message);
+        setShowModal(false);
+      } else {
+        setError(err.message || 'Failed to create booking');
+      }
     } finally {
       setLoading(false);
     }
@@ -220,7 +237,7 @@ const Booking: React.FC = () => {
         <div className="container">
           <div className="page-header">
             <button className="back-button" onClick={() => navigate('/home')}>
-              ← Back to Home
+              &larr; Back to Home
             </button>
             <h1>Please Login</h1>
             <p>You need to be logged in to book gym slots.</p>
@@ -238,52 +255,54 @@ const Booking: React.FC = () => {
             <span>{getCurrentDate()}</span>
           </div>
           <button className="back-button" onClick={() => navigate('/home')}>
-            ← Back to Home
+            &larr; Back to Home
           </button>
           <h1>IIITDM Gym Slot Booking</h1>
           <p>Select your preferred time slot (Maximum capacity: 30 members per slot)</p>
           
           {/* Week Navigation */}
           <div className="week-navigation" style={{ margin: '20px 0', textAlign: 'center' }}>
-            <button 
-              onClick={() => {
-                const newDate = new Date(currentWeekStart);
-                newDate.setDate(newDate.getDate() - 7);
-                setCurrentWeekStart(newDate);
-              }}
-              style={{ 
-                background: '#4CAF50', 
-                color: 'white', 
-                border: 'none', 
-                padding: '8px 16px', 
-                borderRadius: '5px',
-                marginRight: '10px',
-                cursor: 'pointer'
-              }}
-            >
-              ← Previous Week
-            </button>
+            {getStartOfDay(currentWeekStart).getTime() !== getStartOfCurrentWeek(new Date()).getTime() && (
+              <button 
+                onClick={() => {
+                  setCurrentWeekStart(getStartOfCurrentWeek(new Date()));
+                }}
+                style={{ 
+                  background: '#4CAF50', 
+                  color: 'white', 
+                  border: 'none', 
+                  padding: '8px 16px', 
+                  borderRadius: '5px',
+                  marginRight: '10px',
+                  cursor: 'pointer'
+                }}
+              >
+                &larr; Current Week
+              </button>
+            )}
             <span style={{ color: 'white', margin: '0 20px' }}>
-              Week of {getWeekDates(currentWeekStart)[0].toLocaleDateString()}
+              Week: {getWeekDates(currentWeekStart)[0].toLocaleDateString()} - {getWeekDates(currentWeekStart)[6].toLocaleDateString()}
             </span>
-            <button 
-              onClick={() => {
-                const newDate = new Date(currentWeekStart);
-                newDate.setDate(newDate.getDate() + 7);
-                setCurrentWeekStart(newDate);
-              }}
-              style={{ 
-                background: '#4CAF50', 
-                color: 'white', 
-                border: 'none', 
-                padding: '8px 16px', 
-                borderRadius: '5px',
-                marginLeft: '10px',
-                cursor: 'pointer'
-              }}
-            >
-              Next Week →
-            </button>
+            {getStartOfDay(currentWeekStart).getTime() === getStartOfCurrentWeek(new Date()).getTime() && (
+              <button 
+                onClick={() => {
+                  const newDate = new Date(currentWeekStart);
+                  newDate.setDate(newDate.getDate() + 7);
+                  setCurrentWeekStart(newDate);
+                }}
+                style={{ 
+                  background: '#4CAF50', 
+                  color: 'white', 
+                  border: 'none', 
+                  padding: '8px 16px', 
+                  borderRadius: '5px',
+                  marginLeft: '10px',
+                  cursor: 'pointer'
+                }}
+              >
+                Next Week &rarr;
+              </button>
+            )}
           </div>
         </div>
 
@@ -362,13 +381,14 @@ const Booking: React.FC = () => {
                       className={`booking-slot ${status}`}
                       onClick={() => handleSlotClick(date, time)}
                       style={{ 
-                        cursor: (status === 'full' || status === 'blocked') ? 'not-allowed' : 'pointer' 
+                        cursor: (status === 'full' || status === 'blocked' || status === 'past') ? 'not-allowed' : 'pointer' 
                       }}
                     >
                       {status === 'full' ? 'Full' : 
-                       status === 'blocked' ? 'Blocked' : 'Book'}
+                       status === 'blocked' ? 'Blocked' : 
+                       status === 'past' ? 'Completed' : 'Book'}
                       <div className="capacity">
-                        {status === 'blocked' ? 'N/A' : `${count}/${capacity}`}
+                        {status === 'blocked' || status === 'past' ? 'N/A' : `${count}/${capacity}`}
                       </div>
                     </div>
                   );
@@ -394,6 +414,10 @@ const Booking: React.FC = () => {
           <div className="legend-item">
             <div className="legend-color" style={{ backgroundColor: '#666' }}></div>
             <span>Blocked</span>
+          </div>
+          <div className="legend-item">
+            <div className="legend-color" style={{ backgroundColor: 'rgba(220, 220, 220, 0.9)' }}></div>
+            <span>Completed</span>
           </div>
         </div>
       </div>

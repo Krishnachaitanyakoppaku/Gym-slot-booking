@@ -101,6 +101,21 @@ export const bookingService = {
       throw new Error('This slot is fully booked');
     }
 
+    // Check if user already has a booking for this DAY
+    const { data: dayBooking, error: dayBookingError } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('booking_date', date) // Check for any booking on the same date
+      .eq('status', 'active')
+      .limit(1);
+
+    if (dayBookingError) throw dayBookingError;
+
+    if (dayBooking && dayBooking.length > 0) {
+      throw new Error('You can only book one slot per day. Please cancel your existing booking to book a new one.');
+    }
+
     // Check if user already has a booking for this slot
     const { data: userBooking, error: userBookingError } = await supabase
       .from('bookings')
