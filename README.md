@@ -1,6 +1,25 @@
 # IIITDM Gym Booking System
 
-A modern web application for managing gym slot bookings at IIIT Design and Manufacturing, Kancheepuram.
+## About
+
+This project is a **Gym Slot Booking Application** designed to streamline the process of reserving gym slots. It provides a user-friendly interface for members to book available time slots and a robust admin dashboard for managing bookings, users, and gym capacity.
+
+**Key Features:**
+
+*   **User Authentication:** Secure login and registration for gym members.
+*   **Slot Booking:** Intuitive interface to view available slots and make reservations.
+*   **Booking Management:** Users can view and manage their upcoming bookings.
+*   **Admin Dashboard:** Comprehensive tools for administrators to oversee slots, user accounts, and booking data.
+*   **Announcements & Feedback:** Features for gym management to communicate with users and collect feedback.
+
+**Technologies Used:**
+
+*   **Frontend:** React (TypeScript)
+*   **Backend:** Supabase (PostgreSQL Database, Authentication, and Realtime services)
+
+**Live Demo:** [https://gym-slot-booking.vercel.app/](https://gym-slot-booking.vercel.app/)
+
+---
 
 ## 🎯 **Features**
 
