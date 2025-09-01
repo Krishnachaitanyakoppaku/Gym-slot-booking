@@ -66,6 +66,18 @@ ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view their own profile" ON users
   FOR SELECT USING (auth.uid() = id);
 
+CREATE POLICY "Admins can view all user profiles" ON users
+  FOR SELECT USING (public.is_admin());
+
+CREATE POLICY "Admins can view all user profiles" ON users
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = auth.uid()
+      AND users.is_admin = true
+    )
+  );
+
 CREATE POLICY "Users can update their own profile" ON users
   FOR UPDATE USING (auth.uid() = id);
 
@@ -75,11 +87,7 @@ CREATE POLICY "Anyone can view slots" ON slots
 
 CREATE POLICY "Only admins can modify slots" ON slots
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM users 
-      WHERE users.id = auth.uid() 
-      AND users.is_admin = true
-    )
+    public.is_admin()
   );
 
 -- Bookings policies
@@ -94,11 +102,7 @@ CREATE POLICY "Users can cancel their own bookings" ON bookings
 
 CREATE POLICY "Admins can view all bookings" ON bookings
   FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM users 
-      WHERE users.id = auth.uid() 
-      AND users.is_admin = true
-    )
+    public.is_admin()
   );
 
 -- Feedback policies
@@ -110,25 +114,23 @@ CREATE POLICY "Users can view their own feedback" ON feedback
 
 CREATE POLICY "Admins can view all feedback" ON feedback
   FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM users 
-      WHERE users.id = auth.uid() 
-      AND users.is_admin = true
-    )
+    public.is_admin()
   );
 
 CREATE POLICY "Admins can update feedback status" ON feedback
   FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM users 
-      WHERE users.id = auth.uid() 
-      AND users.is_admin = true
-    )
+    public.is_admin()
   );
+
+-- Function to check if current user is admin (security definer to bypass RLS)
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $
+  SELECT is_admin FROM public.users WHERE id = auth.uid();
+$ LANGUAGE sql SECURITY DEFINER;
 
 -- Function to automatically create user profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER AS $
 BEGIN
   INSERT INTO public.users (id, email, name, student_id, is_admin)
   VALUES (
@@ -140,7 +142,7 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Trigger to call the function on user signup
 CREATE TRIGGER on_auth_user_created
