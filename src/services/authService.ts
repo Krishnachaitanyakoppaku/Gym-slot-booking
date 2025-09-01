@@ -1,8 +1,9 @@
 import { supabase } from '../lib/supabase';
+import { User } from '../lib/supabase';
 
 export const authService = {
   // Sign up new user
-  async signUp(email: string, password: string, name: string, studentId?: string) {
+  async signUp(email: string, password: string, name: string, studentId?: string): Promise<{ user: any | null }> {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -10,17 +11,30 @@ export const authService = {
         data: {
           name,
           student_id: studentId,
-          is_admin: false
-        }
-      }
+          is_admin: false,
+        },
+      },
     });
-    
+
     if (error) throw error;
-    return data;
+    return { user: data.user };
+  },
+
+  async signInWithGoogle(): Promise<void> {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + '/home', // Redirect to home page after successful login
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
   },
 
   // Sign in user
-  async signIn(email: string, password: string) {
+  async signIn(email: string, password: string): Promise<{ user: any | null }> {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password

@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
+import { announcementService } from '../services/announcementService';
+import { Announcement } from '../lib/supabase';
 
 const Home: React.FC = React.memo(() => {
   const [showProfile, setShowProfile] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]); // New state
   const navigate = useNavigate();
+  const location = useLocation();
+  const [shouldAnimate, setShouldAnimate] = useState(false);
 
   // Initialize user data only once
   useEffect(() => {
@@ -13,7 +19,27 @@ const Home: React.FC = React.memo(() => {
     const storedUserEmail = localStorage.getItem('userEmail') || 'cs23b1027@iiitdm.ac.in';
     setUserName(storedUserName);
     setUserEmail(storedUserEmail);
-  }, []);
+
+    // Check if the page was directly visited or refreshed
+    if (location.pathname === '/home' && (document.referrer === '' || performance.navigation.type === performance.navigation.TYPE_RELOAD)) {
+      setShouldAnimate(true);
+    } else {
+      setShouldAnimate(false);
+    }
+  }, [location.pathname]);
+
+  // Fetch announcements
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        const activeAnnouncements = await announcementService.getActiveAnnouncements();
+        setAnnouncements(activeAnnouncements);
+      } catch (error) {
+        console.error('Failed to fetch announcements:', error);
+      }
+    };
+    fetchAnnouncements();
+  }, []); // Empty dependency array means it runs once on mount
 
   const toggleProfile = useCallback(() => {
     setShowProfile(prev => !prev);
@@ -67,11 +93,27 @@ const Home: React.FC = React.memo(() => {
       <div className="content">
         <h1 className="title">Welcome to IIITDM Gym</h1>
         <p className="subtitle">Your journey to fitness begins here</p>
-        <button className="cta-button" onClick={() => navigateToPage('/booking')}>
+
+        {announcements.length > 0 && (
+          <div className="announcements-section" style={{ marginBottom: '30px', background: 'rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'left' }}>
+            <h3 style={{ color: '#4CAF50', marginBottom: '10px' }}>Latest Announcements</h3>
+            {announcements.map(announcement => (
+              <div key={announcement.id} style={{ marginBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                <h4 style={{ color: 'white', marginBottom: '5px' }}>{announcement.title}</h4>
+                <p style={{ color: '#ddd', fontSize: '0.9rem' }}>{announcement.content}</p>
+                {announcement.expires_at && (
+                  <p style={{ color: '#bbb', fontSize: '0.8rem' }}>Expires: {new Date(announcement.expires_at).toLocaleDateString()}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button className={`cta-button ${shouldAnimate ? 'animate-on-load' : ''}`} onClick={() => navigateToPage('/booking')}>
           Book Your Slot
         </button>
 
-        <div className="features">
+        <div className={`features ${shouldAnimate ? 'animate-on-load' : ''}`}>
           <div className="feature-card" onClick={() => navigateToPage('/my-bookings')}>
             <div className="feature-icon">📅</div>
             <h3 className="feature-title">My Booked Slots</h3>

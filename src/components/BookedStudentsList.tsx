@@ -36,12 +36,15 @@ const BookedStudentsList: React.FC = () => {
       
       // Fetch all slots for the current day
       const slotsData = await slotService.getSlotsForWeek([dateString]);
+      const slotIds = slotsData.map(s => s.id);
+
+      // Fetch all bookings for these slots in one go
+      const allBookings = await bookingService.getBookingsForSlotIds(slotIds);
 
       const newBookingsMap = new Map<string, Booking[]>();
-      for (const slot of slotsData) {
-        const slotBookings = await bookingService.getSlotBookings(slot.id);
-        newBookingsMap.set(slot.id, slotBookings);
-      }
+      slotsData.forEach(slot => {
+        newBookingsMap.set(slot.id, allBookings.filter(b => b.slot_id === slot.id));
+      });
       
       setSlots(slotsData);
       setBookingsMap(newBookingsMap);
@@ -70,6 +73,9 @@ const BookedStudentsList: React.FC = () => {
           <button className="back-button" onClick={() => navigate('/admin/dashboard')}>
             &larr; Back to Admin Dashboard
           </button>
+          <button className="btn btn-info" onClick={() => window.print()} style={{ marginLeft: '10px' }}>
+            Print List
+          </button>
           <h1>Booked Students List</h1>
           <p>View students booked for each slot, day-wise.</p>
         </div>
@@ -95,39 +101,40 @@ const BookedStudentsList: React.FC = () => {
         )}
 
         {!loading && slots.length > 0 && (
-          <div className="slots-list">
-            {timeSlots.map(timeSlot => {
-              const slot = slots.find(s => s.time_slot === timeSlot);
-              const bookings = slot ? bookingsMap.get(slot.id) : [];
+          <table className="bookings-table">
+            <thead>
+              <tr>
+                <th>Time Slot</th>
+                <th>Student Name</th>
+                <th>Student Email</th>
+                <th>Booked On</th>
+              </tr>
+            </thead>
+            <tbody>
+              {timeSlots.map(timeSlot => {
+                const slot = slots.find(s => s.time_slot === timeSlot);
+                const bookings: Booking[] = slot ? (bookingsMap.get(slot.id) || []) : [];
 
-              return (
-                <div key={timeSlot} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '15px', padding: '15px' }}>
-                  <h3 style={{ color: '#4CAF50', marginBottom: '10px' }}>{timeSlot}</h3>
-                  {slot && (
-                    <p style={{ color: '#ddd', fontSize: '0.9rem', marginBottom: '10px' }}>
-                      Capacity: {slot.capacity}, Blocked: {slot.is_blocked ? 'Yes' : 'No'}
-                    </p>
-                  )}
-                  
-                  {bookings && bookings.length > 0 ? (
-                    <ul style={{ listStyle: 'none', padding: 0 }}>
-                      {bookings.map(booking => (
-                        <li key={booking.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '10px', borderRadius: '5px', marginBottom: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <strong style={{ color: 'white' }}>{booking.user?.name || 'Unknown User'}</strong>
-                            <span style={{ display: 'block', fontSize: '0.8rem', color: '#bbb' }}>{booking.user?.email || 'No Email'}</span>
-                          </div>
-                          <span style={{ fontSize: '0.8rem', color: '#aaa' }}>Booked: {new Date(booking.created_at).toLocaleDateString()}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p style={{ color: '#bbb' }}>No students booked for this slot.</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                if (!slot || bookings.length === 0) {
+                  return (
+                    <tr key={timeSlot}>
+                      <td>{timeSlot}</td>
+                      <td colSpan={3}>No students booked for this slot.</td>
+                    </tr>
+                  );
+                }
+
+                return bookings.map((booking, index) => (
+                  <tr key={booking.id}>
+                    {index === 0 && <td rowSpan={bookings.length}>{timeSlot}</td>}
+                    <td>{booking.user?.name || 'Unknown User'}</td>
+                    <td>{booking.user?.email || 'No Email'}</td>
+                    <td>{new Date(booking.created_at).toLocaleDateString()}</td>
+                  </tr>
+                ));
+              })}
+            </tbody>
+          </table>
         )}
       </div>
     </div>

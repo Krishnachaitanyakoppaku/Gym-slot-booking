@@ -196,5 +196,24 @@ export const bookingService = {
 
     if (error) throw error;
     return data || [];
+  },
+
+  // Get bookings for a list of slot IDs
+  async getBookingsForSlotIds(slotIds: string[]): Promise<Booking[]> {
+    if (slotIds.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        user:users(name, email, student_id),
+        slot:slots(*)
+      `)
+      .in('slot_id', slotIds)
+      .eq('status', 'active')
+      .order('created_at', { ascending: true }); // Order by creation date for consistency
+
+    if (error) throw error;
+    return data || [];
   }
 };

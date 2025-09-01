@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { slotService } from '../services/slotService';
 import { bookingService } from '../services/bookingService';
 import { feedbackService } from '../services/feedbackService';
-import { Slot, Booking, Feedback as FeedbackType } from '../lib/supabase';
+import { announcementService } from '../services/announcementService';
+import { Slot, Booking, Feedback as FeedbackType, Announcement } from '../lib/supabase';
 
 // Helper function to get the start of the day
 const getStartOfDay = (date: Date) => {
@@ -15,10 +16,16 @@ const getStartOfDay = (date: Date) => {
 // Optimized Admin Dashboard Component
 const AdminDashboard: React.FC = () => {
   // State management
-  const [activeTab, setActiveTab] = useState<'slots' | 'feedback'>('slots');
+  const [activeTab, setActiveTab] = useState<'slots' | 'feedback' | 'announcements'>('slots');
   const [slots, setSlots] = useState<Slot[]>([]);
   const [bookingCounts, setBookingCounts] = useState<Map<string, number>>(new Map());
   const [feedbacks, setFeedbacks] = useState<FeedbackType[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [newAnnouncementTitle, setNewAnnouncementTitle] = useState('');
+  const [newAnnouncementContent, setNewAnnouncementContent] = useState('');
+  const [newAnnouncementExpiresAt, setNewAnnouncementExpiresAt] = useState<string>('');
+  const [newAnnouncementIsActive, setNewAnnouncementIsActive] = useState(true);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getStartOfDay(new Date()));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -69,9 +76,10 @@ const AdminDashboard: React.FC = () => {
 
       await slotService.initializeSlotsForDateRange(dateStrings[0], dateStrings[dateStrings.length - 1]);
       
-      const [slotsData, feedbackData] = await Promise.all([
+      const [slotsData, feedbackData, announcementsData] = await Promise.all([
         slotService.getSlotsForWeek(dateStrings), 
-        feedbackService.getAllFeedback()
+        feedbackService.getAllFeedback(),
+        announcementService.getAllAnnouncements()
       ]);
 
       const slotIds = slotsData.map(s => s.id);
@@ -80,6 +88,7 @@ const AdminDashboard: React.FC = () => {
       setSlots(slotsData);
       setBookingCounts(new Map(Object.entries(counts)));
       setFeedbacks(feedbackData);
+      setAnnouncements(announcementsData);
 
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
@@ -143,6 +152,74 @@ const AdminDashboard: React.FC = () => {
     navigate('/');
   };
 
+  const handleResolveFeedback = async (feedbackId: string) => {
+    try {
+      await feedbackService.updateFeedbackStatus(feedbackId, 'resolved');
+      // Refresh feedback list after updating status
+      loadData(); 
+    } catch (err: any) {
+      setError(err.message || 'Failed to update feedback status');
+    }
+  };
+
+  const handleCreateUpdateAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingAnnouncement) {
+        await announcementService.updateAnnouncement(
+          editingAnnouncement.id,
+          newAnnouncementTitle,
+          newAnnouncementContent,
+          newAnnouncementExpiresAt || null,
+          newAnnouncementIsActive
+        );
+      } else {
+        await announcementService.createAnnouncement(
+          newAnnouncementTitle,
+          newAnnouncementContent,
+          newAnnouncementExpiresAt || null
+        );
+      }
+      alert('Announcement saved successfully!');
+      setNewAnnouncementTitle('');
+      setNewAnnouncementContent('');
+      setNewAnnouncementExpiresAt('');
+      setNewAnnouncementIsActive(true);
+      setEditingAnnouncement(null);
+      loadData(); // Refresh announcements
+    } catch (err: any) {
+      setError(err.message || 'Failed to save announcement');
+    }
+  };
+
+  const handleEditAnnouncement = (announcement: Announcement) => {
+    setEditingAnnouncement(announcement);
+    setNewAnnouncementTitle(announcement.title);
+    setNewAnnouncementContent(announcement.content);
+    setNewAnnouncementExpiresAt(announcement.expires_at ? new Date(announcement.expires_at).toISOString().split('T')[0] : '');
+    setNewAnnouncementIsActive(announcement.is_active);
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this announcement?')) {
+      try {
+        await announcementService.deleteAnnouncement(id);
+        alert('Announcement deleted successfully!');
+        loadData(); // Refresh announcements
+      } catch (err: any) {
+        setError(err.message || 'Failed to delete announcement');
+      }
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingAnnouncement(null);
+    setNewAnnouncementTitle('');
+    setNewAnnouncementContent('');
+    setNewAnnouncementExpiresAt('');
+    setNewAnnouncementIsActive(true);
+  };
+
   // Rendering Logic
   const renderSlot = (date: Date, time: string) => {
     const dateStr = formatDate(date);
@@ -190,6 +267,8 @@ const AdminDashboard: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1rem' }}>
             <button onClick={() => setActiveTab('slots')} className={`btn ${activeTab === 'slots' ? 'btn-primary' : 'btn-secondary'}`}>Slot Management</button>
             <button onClick={() => setActiveTab('feedback')} className={`btn ${activeTab === 'feedback' ? 'btn-primary' : 'btn-secondary'}`}>Feedback</button>
+            <button onClick={() => setActiveTab('announcements')} className={`btn ${activeTab === 'announcements' ? 'btn-primary' : 'btn-secondary'}`}>Announcements</button>
+            <button onClick={() => navigate('/admin/booked-students')} className="btn btn-info">View All Bookings</button>
             <button onClick={handleLogout} className="btn btn-danger">Logout</button>
           </div>
         </div>
@@ -235,7 +314,150 @@ const AdminDashboard: React.FC = () => {
         )}
 
         {activeTab === 'feedback' && !loading && (
-          <div className="feedback-management">{feedbacks.map(f => <div key={f.id} className="feedback-card">...</div>)}</div>
+          <div className="feedback-management">
+            {feedbacks.length > 0 ? (
+              feedbacks.map(f => (
+                <div key={f.id} className="feedback-card">
+                  <div className="feedback-header">
+                    <div className="feedback-info">
+                      <h3>{f.subject}</h3>
+                      <p>From: {f.name} ({f.user?.email || f.email})</p>
+                    </div>
+                    <div className="feedback-meta">
+                      <span className="feedback-rating">Rating: {f.rating} ⭐</span>
+                      <span className="feedback-date">Submitted: {new Date(f.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <p className="feedback-message">{f.message}</p>
+                  {f.status !== 'resolved' && (
+                    <div className="feedback-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
+                      <button 
+                        className="btn btn-primary" 
+                        onClick={() => handleResolveFeedback(f.id)}
+                        style={{ padding: '8px 15px', fontSize: '0.9rem' }}
+                      >
+                        Mark as Resolved
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div style={{ textAlign: 'center', color: 'white', padding: '20px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px' }}>
+                <h3>No feedback received yet.</h3>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'announcements' && !loading && (
+          <div className="announcements-management">
+            <h2>Announcements Management</h2>
+            <div className="announcement-form-section">
+              <h3>{editingAnnouncement ? 'Edit Announcement' : 'Create New Announcement'}</h3>
+              <form onSubmit={handleCreateUpdateAnnouncement} style={{ display: 'flex', flexDirection: 'column', gap: '15px', background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '8px' }}>
+                <div className="form-group">
+                  <label htmlFor="announcementTitle">Title</label>
+                  <input
+                    type="text"
+                    id="announcementTitle"
+                    value={newAnnouncementTitle}
+                    onChange={(e) => setNewAnnouncementTitle(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="announcementContent">Content</label>
+                  <textarea
+                    id="announcementContent"
+                    value={newAnnouncementContent}
+                    onChange={(e) => setNewAnnouncementContent(e.target.value)}
+                    required
+                    rows={4}
+                  ></textarea>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="announcementExpiresAt">Expires At (Optional)</label>
+                  <input
+                    type="date"
+                    id="announcementExpiresAt"
+                    value={newAnnouncementExpiresAt}
+                    onChange={(e) => setNewAnnouncementExpiresAt(e.target.value)}
+                  />
+                </div>
+                {editingAnnouncement && (
+                  <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                      type="checkbox"
+                      id="announcementIsActive"
+                      checked={newAnnouncementIsActive}
+                      onChange={(e) => setNewAnnouncementIsActive(e.target.checked)}
+                    />
+                    <label htmlFor="announcementIsActive">Is Active</label>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button type="submit" className="btn btn-primary">
+                    {editingAnnouncement ? 'Update Announcement' : 'Create Announcement'}
+                  </button>
+                  {editingAnnouncement && (
+                    <button type="button" className="btn btn-secondary" onClick={handleCancelEdit}>
+                      Cancel Edit
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            <div className="announcements-list-section" style={{ marginTop: '30px' }}>
+              <h3>Existing Announcements</h3>
+              {announcements.length > 0 ? (
+                <table className="bookings-table"> {/* Reusing bookings-table styles */}
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Content</th>
+                      <th>Created At</th>
+                      <th>Expires At</th>
+                      <th>Active</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {announcements.map(announcement => (
+                      <tr key={announcement.id}>
+                        <td>{announcement.title}</td>
+                        <td>{announcement.content.substring(0, 100)}{announcement.content.length > 100 ? '...' : ''}</td>
+                        <td>{new Date(announcement.created_at).toLocaleDateString()}</td>
+                        <td>{announcement.expires_at ? new Date(announcement.expires_at).toLocaleDateString() : 'N/A'}</td>
+                        <td>{announcement.is_active ? 'Yes' : 'No'}</td>
+                        <td>
+                          <button 
+                            className="btn btn-secondary" 
+                            onClick={() => handleEditAnnouncement(announcement)}
+                            style={{ marginRight: '5px', padding: '5px 10px', fontSize: '0.8rem' }}
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            className="btn btn-danger" 
+                            onClick={() => handleDeleteAnnouncement(announcement.id)}
+                            style={{ padding: '5px 10px', fontSize: '0.8rem' }}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div style={{ textAlign: 'center', color: 'white', padding: '20px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px' }}>
+                  <p>No announcements created yet.</p>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {showSlotModal && selectedSlot && (

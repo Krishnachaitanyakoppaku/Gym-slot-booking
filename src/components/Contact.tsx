@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { feedbackService } from '../services/feedbackService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface FormData {
   name: string;
   email: string;
   subject: string;
   message: string;
-  rating: string;
 }
 
 interface Trainer {
@@ -20,12 +21,12 @@ interface Trainer {
 
 const Contact: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth(); // Get user from AuthContext
   const [formData, setFormData] = useState<FormData>({
-    name: '',
-    email: '',
+    name: user?.user_metadata?.name || '',
+    email: user?.email || '',
     subject: '',
     message: '',
-    rating: '5'
   });
 
   const trainers: Trainer[] = [
@@ -63,30 +64,34 @@ const Contact: React.FC = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    // In a real app, this would send to a backend API
-    // For demo purposes, we'll store in localStorage for admin to see
-    const existingFeedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
-    const newFeedback = {
-      id: Date.now(),
-      ...formData,
-      submittedAt: new Date().toISOString(),
-      status: 'new'
-    };
-    
-    existingFeedbacks.push(newFeedback);
-    localStorage.setItem('feedbacks', JSON.stringify(existingFeedbacks));
-    
-    alert('Thank you for your feedback! We will get back to you soon.');
-    setFormData({
-      name: '',
-      email: '',
-      subject: '',
-      message: '',
-      rating: '5'
-    });
+    if (!user) {
+      alert('Please log in to submit feedback.');
+      navigate('/'); // Redirect to login page
+      return;
+    }
+
+    try {
+      await feedbackService.submitFeedback(
+        user.id,
+        formData.name,
+        formData.email,
+        formData.subject,
+        formData.message,
+        5 // Default rating since it's removed from UI
+      );
+      alert('Thank you for your feedback! We will get back to you soon.');
+      setFormData({
+        name: user?.user_metadata?.name || '',
+        email: user?.email || '',
+        subject: '',
+        message: '',
+      });
+    } catch (error: any) {
+      alert(`Failed to submit feedback: ${error.message}`);
+    }
   };
 
   return (
@@ -170,21 +175,6 @@ const Contact: React.FC = () => {
               </select>
             </div>
             
-            <div className="form-group">
-              <label htmlFor="rating">Rate your experience</label>
-              <select
-                id="rating"
-                name="rating"
-                value={formData.rating}
-                onChange={handleInputChange}
-              >
-                <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
-                <option value="4">⭐⭐⭐⭐ Good</option>
-                <option value="3">⭐⭐⭐ Average</option>
-                <option value="2">⭐⭐ Poor</option>
-                <option value="1">⭐ Very Poor</option>
-              </select>
-            </div>
             
             <div className="form-group">
               <label htmlFor="message">Message</label>

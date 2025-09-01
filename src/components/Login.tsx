@@ -5,6 +5,7 @@ import { authService } from '../services/authService';
 const Login: React.FC = () => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [isLogin, setIsLogin] = useState<boolean>(true);
   const [name, setName] = useState<string>('');
   const [studentId, setStudentId] = useState<string>('');
@@ -45,8 +46,16 @@ const Login: React.FC = () => {
         }
       } else {
         // User signup
+        if (password !== confirmPassword) {
+          setError('Passwords do not match.');
+          setLoading(false);
+          return;
+        }
         const { user } = await authService.signUp(email, password, name, studentId);
         if (user) {
+          localStorage.setItem('userName', user.user_metadata?.name || email.split('@')[0].toUpperCase());
+          localStorage.setItem('userEmail', user.email || '');
+          localStorage.setItem('userId', user.id);
           setError('Account created successfully! Please check your email to verify your account, then login. If you don\'t receive an email, contact the admin.');
           setIsLogin(true);
         }
@@ -58,11 +67,12 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleGoogleLogin = () => {
-    // Simulate Google login
-    localStorage.setItem('userName', 'CS23B1027');
-    localStorage.setItem('userEmail', 'cs23b1027@iiitdm.ac.in');
-    navigate('/home');
+  const handleGoogleLogin = async () => {
+    try {
+      await authService.signInWithGoogle();
+    } catch (error: any) {
+      setError(error.message || 'Google login failed');
+    }
   };
 
   return (
@@ -147,6 +157,22 @@ const Login: React.FC = () => {
               minLength={6}
             />
           </div>
+          {/* New Confirm Password field */}
+          {!isLogin && (
+            <div className="form-group">
+              <label htmlFor="confirmPassword">Confirm Password</label>
+              <input 
+                type="password" 
+                id="confirmPassword" 
+                name="confirmPassword"
+                placeholder="Confirm your password" 
+                value={confirmPassword}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+            </div>
+          )}
           
           <button type="submit" className="login-btn" disabled={loading}>
             {loading ? 'Processing...' : (isLogin ? 'Login' : 'Sign Up')}

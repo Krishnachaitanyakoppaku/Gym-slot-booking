@@ -49,3 +49,12 @@ export interface Feedback {
   // Relations
   user?: User;
 }
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  expires_at: string | null;
+  is_active: boolean;
+}
